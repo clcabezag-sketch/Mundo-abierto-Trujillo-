@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Trujillo: Ciudad de la Eterna Primavera — Mundo Abierto</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Segoe UI',system-ui,sans-serif; touch-action:none; }
+  #c { display:block; width:100%; height:100%; }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; color:#fff; }
+  #topbar { position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:flex-start; padding:12px 14px; }
+  #locname { font-size:13px; letter-spacing:2px; text-transform:uppercase; background:rgba(10,10,20,.55); padding:8px 14px; border-radius:8px; border-left:3px solid #f2b705; backdrop-filter:blur(6px); }
+  #clock { font-size:12px; background:rgba(10,10,20,.55); padding:8px 12px; border-radius:8px; backdrop-filter:blur(6px); text-align:right; }
+
+  #missions { position:absolute; top:64px; left:14px; background:rgba(10,10,20,.5); padding:10px 12px; border-radius:10px; font-size:11.5px; line-height:1.7; backdrop-filter:blur(6px); max-width:230px; }
+  #missions h3 { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:#f2b705; margin-bottom:4px; }
+  .mi { opacity:.85; } .mi.done { opacity:.45; text-decoration:line-through; } .mi .d { color:#9fd0ff; font-size:10px; }
+
+  #toast { position:absolute; top:18%; left:50%; transform:translateX(-50%) scale(.9); background:rgba(20,20,35,.85); border:1px solid #f2b705; color:#fff; padding:12px 22px; border-radius:12px; font-size:15px; opacity:0; transition:all .4s; text-align:center; backdrop-filter:blur(8px); }
+  #toast.show { opacity:1; transform:translateX(-50%) scale(1); }
+
+  #minimap { position:absolute; bottom:14px; right:14px; width:130px; height:130px; border-radius:50%; border:2px solid rgba(255,255,255,.4); overflow:hidden; background:rgba(0,0,0,.4); }
+  #mmc { width:100%; height:100%; }
+
+  /* ---------- Controles táctiles ---------- */
+  #joy { position:absolute; bottom:30px; left:26px; width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.25); pointer-events:auto; display:none; }
+  #knob { position:absolute; left:50%; top:50%; width:52px; height:52px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
+  #btns { position:absolute; bottom:170px; right:18px; display:none; flex-direction:column; gap:10px; pointer-events:auto; }
+  .btn { width:52px; height:52px; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(255,255,255,.3); color:#fff; font-size:20px; display:flex; align-items:center; justify-content:center; user-select:none; }
+  .btn:active { background:rgba(242,183,5,.5); }
+  body.touch #joy, body.touch #btns { display:flex; }
+
+  /* ---------- Pantalla de inicio ---------- */
+  #start { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center; padding:24px;
+    background:radial-gradient(ellipse at 50% 110%, #2a4d8f 0%, #0b1530 55%, #050810 100%); color:#fff; z-index:10; }
+  #start h1 { font-size:clamp(28px,7vw,52px); letter-spacing:1px; font-weight:800; }
+  #start h1 span { color:#f2b705; }
+  #start .sub { font-size:clamp(12px,3vw,15px); letter-spacing:4px; text-transform:uppercase; color:#9fd0ff; }
+  #start p { max-width:420px; font-size:13.5px; line-height:1.7; opacity:.8; }
+  #play { pointer-events:auto; background:#f2b705; color:#1a1a2e; border:none; font-size:17px; font-weight:700; padding:14px 46px; border-radius:40px; cursor:pointer; letter-spacing:1px; box-shadow:0 6px 30px rgba(242,183,5,.45); }
+  #play:active { transform:scale(.96); }
+  #ctrls { font-size:11px; opacity:.55; line-height:1.8; }
+  #fade { position:fixed; inset:0; background:#000; opacity:0; pointer-events:none; transition:opacity 1.2s; z-index:9; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="start">
+  <div class="sub">Mundo abierto · La Libertad · Perú</div>
+  <h1>TRUJILLO<br><span>Ciudad de la Eterna Primavera</span></h1>
+  <p>Explora el centro histórico: la Plaza de Armas, el Monumento a la Libertad, la Catedral y las casonas coloniales. Completa las 5 misiones de explorador mientras el sol recorre el cielo trujillano.</p>
+  <button id="play">▶ &nbsp;EXPLORAR</button>
+  <div id="ctrls">
+    📱 Móvil: joystick izquierdo para caminar · arrastra la pantalla para mirar<br>
+    💻 PC: clic para capturar el mouse · WASD caminar · SHIFT correr · mouse mirar
+  </div>
+</div>
+<div id="fade"></div>
+
+<div id="hud">
+  <div id="topbar">
+    <div id="locname">Centro Histórico</div>
+    <div id="clock">☀️ 10:00 a.m.</div>
+  </div>
+  <div id="missions">
+    <h3>Misiones de explorador</h3>
+    <div id="mlist"></div>
+  </div>
+  <div id="toast"></div>
+  <div id="minimap"><canvas id="mmc" width="260" height="260"></canvas></div>
+  <div id="joy"><div id="knob"></div></div>
+  <div id="btns">
+    <div class="btn" id="bRun">🏃</div>
+    <div class="btn" id="bTime">🌗</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   TRUJILLO MUNDO ABIERTO — motor del juego
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const isTouch = 'ontouchstart' in window;
+if (isTouch) document.body.classList.add('touch');
+
+/* ---------- Renderer / escena ---------- */
+const renderer = new THREE.WebGLRenderer({ canvas:$('c'), antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputEncoding = THREE.sRGBEncoding;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xbfd8ee, 80, 480);
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, .1, 1200);
+
+/* ---------- Iluminación ---------- */
+const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x8a7355, .85);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff3d6, 1.6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -140; sun.shadow.camera.right = 140;
+sun.shadow.camera.top = 140;  sun.shadow.camera.bottom = -140;
+sun.shadow.camera.far = 600;
+sun.shadow.bias = -0.0004;
+scene.add(sun); scene.add(sun.target);
+
+/* Cielo */
+const skyGeo = new THREE.SphereGeometry(900, 24, 16);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  uniforms: { top:{value:new THREE.Color(0x3f8ddc)}, bot:{value:new THREE.Color(0xcfe8ff)} },
+  vertexShader: `varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader: `varying vec3 vP; uniform vec3 top,bot;
+    void main(){ float h=normalize(vP).y*.5+.5; gl_FragColor=vec4(mix(bot,top,pow(h,.8)),1.);}`
+});
+scene.add(new THREE.Mesh(skyGeo, skyMat));
+
+/* Nubes */
+const cloudMat = new THREE.MeshLambertMaterial({ color:0xffffff, transparent:true, opacity:.85 });
+for (let i=0;i<14;i++){
+  const g = new THREE.Group();
+  const n = 3+Math.floor(Math.random()*4);
+  for (let j=0;j<n;j++){
+    const s = 8+Math.random()*14;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(s, 8, 6), cloudMat);
+    m.position.set((Math.random()-.5)*30, Math.random()*5, (Math.random()-.5)*16);
+    m.scale.y = .45; g.add(m);
+  }
+  g.position.set((Math.random()-.5)*800, 130+Math.random()*60, (Math.random()-.5)*800);
+  g.userData.v = .5+Math.random();
+  g.name = 'cloud'; scene.add(g);
+}
+
+/* ---------- Texturas procedurales ---------- */
+function canvasTex(w,h,fn,rx=1,ry=1){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  fn(c.getContext('2d'),w,h);
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(rx,ry);
+  return t;
+}
+const asphaltTex = canvasTex(256,256,(g,w,h)=>{
+  g.fillStyle='#3a3a3e'; g.fillRect(0,0,w,h);
+  for(let i=0;i<2600;i++){ g.fillStyle=`rgba(${40+Math.random()*60|0},${40+Math.random()*60|0},${40+Math.random()*60|0},.5)`; g.fillRect(Math.random()*w,Math.random()*h,1.5,1.5); }
+},8,8);
+const sidewalkTex = canvasTex(256,256,(g,w,h)=>{
+  g.fillStyle='#b9b2a4'; g.fillRect(0,0,w,h);
+  g.strokeStyle='rgba(0,0,0,.25)'; g.lineWidth=2;
+  for(let i=0;i<=4;i++){ g.beginPath(); g.moveTo(i*64,0); g.lineTo(i*64,h); g.stroke(); g.beginPath(); g.moveTo(0,i*64); g.lineTo(w,i*64); g.stroke(); }
+  for(let i=0;i<1200;i++){ g.fillStyle='rgba(0,0,0,.07)'; g.fillRect(Math.random()*w,Math.random()*h,2,2); }
+},6,6);
+const grassTex = canvasTex(128,128,(g,w,h)=>{
+  g.fillStyle='#4a7c3a'; g.fillRect(0,0,w,h);
+  for(let i=0;i<1600;i++){ g.fillStyle=Math.random()<.5?'#54924011':'#3c682e22';
+    g.fillStyle=`rgba(${50+Math.random()*60|0},${110+Math.random()*60|0},${40+Math.random()*40|0},.45)`;
+    g.fillRect(Math.random()*w,Math.random()*h,2,3); }
+},4,4);
+function wallTex(base){
+  return canvasTex(128,128,(g,w,h)=>{
+    g.fillStyle=base; g.fillRect(0,0,w,h);
+    for(let i=0;i<700;i++){ g.fillStyle=`rgba(0,0,0,${Math.random()*.06})`; g.fillRect(Math.random()*w,Math.random()*h,2,2); }
+    for(let i=0;i<300;i++){ g.fillStyle=`rgba(255,255,255,${Math.random()*.06})`; g.fillRect(Math.random()*w,Math.random()*h,2,2); }
+  },1,1);
+}
+
+/* ---------- Mundo: trazado de la ciudad ---------- */
+const BLOCK=46, ST=14, GRID=7;           // tamaño de manzana, ancho de calle, manzanas por lado
+const SPAN=(BLOCK+ST)*GRID;              // extensión total
+const HALF=SPAN/2;
+const colliders=[];                      // cajas de colisión {x,z,hw,hd}
+const landmarks=[];                      // {name,x,z,r}
+
+/* Suelo base (tierra alrededor) */
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000,2000),
+  new THREE.MeshLambertMaterial({ color:0x9a8866 }));
+ground.rotation.x=-Math.PI/2; ground.position.y=-.05; ground.receiveShadow=true;
+scene.add(ground);
+
+/* Calles (un solo plano de asfalto bajo todo el centro) */
+const streets = new THREE.Mesh(new THREE.PlaneGeometry(SPAN+ST, SPAN+ST),
+  new THREE.MeshLambertMaterial({ map:asphaltTex }));
+streets.rotation.x=-Math.PI/2; streets.receiveShadow=true;
+scene.add(streets);
+
+/* Líneas viales */
+const lineMat=new THREE.MeshBasicMaterial({color:0xd8d8c8});
+for(let i=0;i<=GRID;i++){
+  const p=-HALF + i*(BLOCK+ST) - ST/2 + ST/2; // centro de cada calle
+  const cx = -HALF + i*(BLOCK+ST) - ST/2;
+  for(let s=-HALF; s<HALF; s+=6){
+    const l1=new THREE.Mesh(new THREE.PlaneGeometry(.35,2.6),lineMat);
+    l1.rotation.x=-Math.PI/2; l1.position.set(cx, .02, s); scene.add(l1);
+    const l2=new THREE.Mesh(new THREE.PlaneGeometry(2.6,.35),lineMat);
+    l2.rotation.x=-Math.PI/2; l2.position.set(s, .02, cx); scene.add(l2);
+  }
+}
+
+/* ---------- Paleta colonial trujillana ---------- */
+const palette=['#2a6db5','#f2b705','#e07b39','#b03a2e','#f5f0e6','#7d9e5f','#d9a44a','#3f7fae','#c1543c','#efe3c8'];
+const wallTexCache={};
+function getWall(c){ if(!wallTexCache[c]) wallTexCache[c]=wallTex(c); return wallTexCache[c]; }
+
+const winMat = new THREE.MeshLambertMaterial({ color:0x182433 });
+const winLitMat = new THREE.MeshLambertMaterial({ color:0x182433, emissive:0xffc46b, emissiveIntensity:0 });
+const frameMat = new THREE.MeshLambertMaterial({ color:0xf7f3ea });
+const woodMat = new THREE.MeshLambertMaterial({ color:0x4a3220 });
+const doorMat = new THREE.MeshLambertMaterial({ color:0x3a2718 });
+const tileMat = new THREE.MeshLambertMaterial({ color:0x9c4a32 });
+
+/* Casona colonial */
+function casona(w, d, floors, color){
+  const g=new THREE.Group();
+  const h=floors*4.2;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshLambertMaterial({map:getWall(color)}));
+  body.position.y=h/2; body.castShadow=true; body.receiveShadow=true; g.add(body);
+  /* cornisa */
+  const cor=new THREE.Mesh(new THREE.BoxGeometry(w+.6,.5,d+.6), frameMat);
+  cor.position.y=h+.2; cor.castShadow=true; g.add(cor);
+  /* techo de tejas leve */
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(w+.2,.6,d+.2), tileMat);
+  roof.position.y=h+.7; g.add(roof);
+  /* ventanas y balcones en fachada frontal (+z) */
+  const cols=Math.max(2, Math.floor(w/5.5));
+  for(let f=0;f<floors;f++){
+    for(let i=0;i<cols;i++){
+      const x=-w/2 + (i+.5)*(w/cols);
+      const y=f*4.2+2.4;
+      if(f===0 && i===Math.floor(cols/2)){
+        /* portón */
+        const door=new THREE.Mesh(new THREE.BoxGeometry(2.2,3.4,.25), doorMat);
+        door.position.set(x,1.7,d/2+.1); g.add(door);
+        const arch=new THREE.Mesh(new THREE.BoxGeometry(2.9,3.9,.18), frameMat);
+        arch.position.set(x,1.95,d/2+.02); g.add(arch);
+        continue;
+      }
+      const fr=new THREE.Mesh(new THREE.BoxGeometry(1.9,2.6,.16), frameMat);
+      fr.position.set(x,y,d/2+.05); g.add(fr);
+      const wn=new THREE.Mesh(new THREE.BoxGeometry(1.4,2.1,.18), Math.random()<.5?winLitMat:winMat);
+      wn.position.set(x,y,d/2+.1); g.add(wn);
+      if(f>0 && Math.random()<.6){
+        /* balcón de madera trujillano */
+        const bal=new THREE.Mesh(new THREE.BoxGeometry(2.6,.18,1), woodMat);
+        bal.position.set(x,y-1.25,d/2+.55); bal.castShadow=true; g.add(bal);
+        const rail=new THREE.Mesh(new THREE.BoxGeometry(2.6,1,.1), woodMat);
+        rail.position.set(x,y-.8,d/2+1); g.add(rail);
+        for(let b=-1;b<=1;b+=2){
+          const side=new THREE.Mesh(new THREE.BoxGeometry(.1,1,1), woodMat);
+          side.position.set(x+b*1.25,y-.8,d/2+.55); g.add(side);
+        }
+      }
+    }
+  }
+  return {g,h};
+}
+
+/* Colocar edificios alrededor de cada manzana */
+const plazaBlocks=new Set(['3,3']); // manzana central = Plaza de Armas
+function blockOrigin(i,j){ return [-HALF + ST/2 + i*(BLOCK+ST), -HALF + ST/2 + j*(BLOCK+ST)]; }
+
+for(let i=0;i<GRID;i++) for(let j=0;j<GRID;j++){
+  const [bx,bz]=blockOrigin(i,j);
+  /* vereda */
+  const sw=new THREE.Mesh(new THREE.BoxGeometry(BLOCK+3, .25, BLOCK+3),
+    new THREE.MeshLambertMaterial({map:sidewalkTex}));
+  sw.position.set(bx+BLOCK/2, .12, bz+BLOCK/2); sw.receiveShadow=true;
+  scene.add(sw);
+  if(plazaBlocks.has(i+','+j)) continue;        // la plaza se construye aparte
+  if(i===4 && j===3) continue;                   // manzana de la Catedral
+  if(i===2 && j===2) continue;                   // mercado
+  /* edificios perimetrales */
+  const seed=(i*13+j*7);
+  let x=4;
+  while(x<BLOCK-6){
+    const w=8+((seed*x*31)%9);
+    const floors=1+((seed+x)%2)+((i+j)%2===0&&x%3===0?1:0);
+    const col=palette[(seed+x)%palette.length];
+    const {g}=casona(w,9,floors,col);
+    /* fachada hacia el sur de la manzana */
+    g.position.set(bx+x+w/2, .25, bz+5);
+    g.rotation.y=Math.PI;
+    scene.add(g);
+    colliders.push({x:bx+x+w/2, z:bz+5, hw:w/2, hd:4.5});
+    /* fachada norte */
+    const w2=8+((seed*x*17)%8);
+    const {g:g2}=casona(w2,9,1+((seed+x+1)%3),palette[(seed+x+3)%palette.length]);
+    g2.position.set(bx+x+w2/2, .25, bz+BLOCK-5);
+    scene.add(g2);
+    colliders.push({x:bx+x+w2/2, z:bz+BLOCK-5, hw:w2/2, hd:4.5});
+    x+=Math.max(w,w2)+1.5;
+  }
+}
+
+/* ---------- Plaza de Armas ---------- */
+const [px,pz]=blockOrigin(3,3);
+const PCX=px+BLOCK/2, PCZ=pz+BLOCK/2;
+landmarks.push({name:'Plaza de Armas', x:PCX, z:PCZ, r:16});
+
+/* jardines */
+const plazaFloor=new THREE.Mesh(new THREE.CylinderGeometry(BLOCK/2+1,BLOCK/2+1,.3,48),
+  new THREE.MeshLambertMaterial({map:sidewalkTex}));
+plazaFloor.position.set(PCX,.15,PCZ); plazaFloor.receiveShadow=true; scene.add(plazaFloor);
+for(let a=0;a<4;a++){
+  const ang=a*Math.PI/2 + Math.PI/4;
+  const gpatch=new THREE.Mesh(new THREE.CylinderGeometry(7.5,7.5,.32,24),
+    new THREE.MeshLambertMaterial({map:grassTex}));
+  gpatch.position.set(PCX+Math.cos(ang)*13.5,.18,PCZ+Math.sin(ang)*13.5);
+  gpatch.receiveShadow=true; scene.add(gpatch);
+}
+
+/* Monumento a la Libertad */
+(function(){
+  const g=new THREE.Group();
+  const mar=new THREE.MeshStandardMaterial({color:0xf2efe6,roughness:.5,metalness:.05});
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(6,7,1.6,24),mar); base.position.y=.8; g.add(base);
+  const base2=new THREE.Mesh(new THREE.CylinderGeometry(4,5,1.6,20),mar); base2.position.y=2.2; g.add(base2);
+  /* figuras de la base */
+  for(let k=0;k<3;k++){
+    const fig=new THREE.Group();
+    const t=new THREE.Mesh(new THREE.CylinderGeometry(.45,.55,1.6,8),mar); t.position.y=3.8; fig.add(t);
+    const hd=new THREE.Mesh(new THREE.SphereGeometry(.38,10,8),mar); hd.position.y=4.9; fig.add(hd);
+    fig.rotation.y=k*2.1; fig.position.x=Math.cos(k*2.1)*2.6; fig.position.z=Math.sin(k*2.1)*2.6;
+    g.add(fig);
+  }
+  const col=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.5,12,16),mar); col.position.y=9; col.castShadow=true; g.add(col);
+  /* genio alado de la libertad */
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.5,.7,2.4,10),mar); body.position.y=16.2; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.45,10,8),mar); head.position.y=17.8; g.add(head);
+  const armG=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,2.4,6),mar);
+  armG.position.set(.7,17.4,0); armG.rotation.z=-.9; g.add(armG);
+  const antor=new THREE.Mesh(new THREE.SphereGeometry(.3,8,6),new THREE.MeshStandardMaterial({color:0xffd34d,emissive:0xff9000,emissiveIntensity:.6}));
+  antor.position.set(1.55,18.3,0); g.add(antor);
+  for(let s=-1;s<=1;s+=2){
+    const wing=new THREE.Mesh(new THREE.BoxGeometry(.15,2.2,1.2),mar);
+    wing.position.set(s*.5,16.6,-.5); wing.rotation.set(.4,s*.5,s*.6); g.add(wing);
+  }
+  g.traverse(o=>{ if(o.isMesh){o.castShadow=true;} });
+  g.position.set(PCX,0.2,PCZ);
+  scene.add(g);
+  colliders.push({x:PCX,z:PCZ,hw:6.5,hd:6.5});
+})();
+
+/* Bancas y faroles de la plaza */
+const lampMat=new THREE.MeshLambertMaterial({color:0x1c2a1c});
+const lampGlowMat=new THREE.MeshLambertMaterial({color:0xfff2c0,emissive:0xffc24d,emissiveIntensity:0});
+const lampGlows=[];
+function farol(x,z){
+  const g=new THREE.Group();
+  const post=new THREE.Mesh(new THREE.CylinderGeometry(.12,.18,4.4,8),lampMat); post.position.y=2.2; post.castShadow=true; g.add(post);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.4,10,8),lampGlowMat.clone()); head.position.y=4.6; g.add(head);
+  lampGlows.push(head.material);
+  g.position.set(x,.2,z); scene.add(g);
+}
+function banca(x,z,rot){
+  const g=new THREE.Group();
+  const s=new THREE.Mesh(new THREE.BoxGeometry(3,.18,.9),woodMat); s.position.y=.65; g.add(s);
+  const b=new THREE.Mesh(new THREE.BoxGeometry(3,.8,.12),woodMat); b.position.set(0,1.1,-.42); g.add(b);
+  for(let k=-1;k<=1;k+=2){ const leg=new THREE.Mesh(new THREE.BoxGeometry(.15,.65,.8),lampMat); leg.position.set(k*1.3,.32,0); g.add(leg); }
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+  g.position.set(x,.2,z); g.rotation.y=rot; scene.add(g);
+}
+for(let a=0;a<8;a++){
+  const ang=a*Math.PI/4;
+  farol(PCX+Math.cos(ang)*20, PCZ+Math.sin(ang)*20);
+  banca(PCX+Math.cos(ang+.2)*17.5, PCZ+Math.sin(ang+.2)*17.5, -ang-Math.PI/2+.2);
+}
+/* Faroles en esquinas de manzanas */
+for(let i=0;i<GRID;i++) for(let j=0;j<GRID;j++){
+  if((i+j)%2) continue;
+  const [bx,bz]=blockOrigin(i,j);
+  farol(bx+1.5,bz+1.5); farol(bx+BLOCK-1.5,bz+BLOCK-1.5);
+}
+
+/* ---------- Palmeras ---------- */
+const trunkMat=new THREE.MeshLambertMaterial({color:0x7a5a38});
+const frondMat=new THREE.MeshLambertMaterial({color:0x2f7a33, side:THREE.DoubleSide});
+function palmera(x,z,s=1){
+  const g=new THREE.Group();
+  const h=7+Math.random()*4;
+  const tr=new THREE.Mesh(new THREE.CylinderGeometry(.22,.4,h,7),trunkMat);
+  tr.position.y=h/2; tr.castShadow=true; g.add(tr);
+  for(let k=0;k<7;k++){
+    const fr=new THREE.Mesh(new THREE.ConeGeometry(.5,4.6,4),frondMat);
+    fr.position.y=h; fr.rotation.z=Math.PI/2.4; fr.rotation.y=k*(Math.PI*2/7);
+    fr.translateY(2); fr.castShadow=true; g.add(fr);
+  }
+  const coco=new THREE.Mesh(new THREE.SphereGeometry(.55,8,6),new THREE.MeshLambertMaterial({color:0x3c5a2a}));
+  coco.position.y=h; g.add(coco);
+  g.scale.setScalar(s); g.position.set(x,.2,z); scene.add(g);
+  colliders.push({x,z,hw:.6,hd:.6});
+}
+for(let a=0;a<12;a++){
+  const ang=a*Math.PI/6+.15;
+  palmera(PCX+Math.cos(ang)*(11+(a%2)*5), PCZ+Math.sin(ang)*(11+(a%2)*5));
+}
+
+/* ---------- Catedral de Trujillo ---------- */
+(function(){
+  const [bx,bz]=blockOrigin(4,3);
+  const cx=bx+BLOCK/2, cz=bz+BLOCK/2;
+  landmarks.push({name:'Catedral de Trujillo', x:bx+10, z:cz, r:15});
+  const g=new THREE.Group();
+  const yellow=new THREE.MeshLambertMaterial({map:getWall('#e8a818')});
+  const white=frameMat;
+  /* nave */
+  const nave=new THREE.Mesh(new THREE.BoxGeometry(22,13,34),yellow);
+  nave.position.set(0,6.5,8); nave.castShadow=true; nave.receiveShadow=true; g.add(nave);
+  const roofN=new THREE.Mesh(new THREE.CylinderGeometry(0,9,7,4),tileMat);
+  roofN.rotation.y=Math.PI/4; roofN.scale.set(1.7,1,2.7); roofN.position.set(0,16.4,8); g.add(roofN);
+  /* fachada y torres gemelas */
+  const fac=new THREE.Mesh(new THREE.BoxGeometry(24,15,3),yellow); fac.position.set(0,7.5,-10); fac.castShadow=true; g.add(fac);
+  for(let s=-1;s<=1;s+=2){
+    const tower=new THREE.Mesh(new THREE.BoxGeometry(6,21,6),yellow);
+    tower.position.set(s*9,10.5,-10); tower.castShadow=true; g.add(tower);
+    const belfry=new THREE.Mesh(new THREE.BoxGeometry(4.6,4.5,4.6),white);
+    belfry.position.set(s*9,23,-10); g.add(belfry);
+    const cup=new THREE.Mesh(new THREE.SphereGeometry(2.6,12,8),white);
+    cup.position.set(s*9,26.4,-10); cup.scale.y=1.2; g.add(cup);
+    const cross=new THREE.Mesh(new THREE.BoxGeometry(.18,2,.18),white); cross.position.set(s*9,29.5,-10); g.add(cross);
+    const crossH=new THREE.Mesh(new THREE.BoxGeometry(1,.18,.18),white); crossH.position.set(s*9,29.7,-10); g.add(crossH);
+    /* campana */
+    const bell=new THREE.Mesh(new THREE.ConeGeometry(.8,1.2,10),new THREE.MeshStandardMaterial({color:0x8a6a1f,metalness:.7,roughness:.4}));
+    bell.position.set(s*9,23,-7.6); g.add(bell);
+  }
+  /* portada blanca */
+  const portal=new THREE.Mesh(new THREE.BoxGeometry(8,11,1),white); portal.position.set(0,5.5,-11.2); g.add(portal);
+  const pdoor=new THREE.Mesh(new THREE.BoxGeometry(4,6.5,.6),doorMat); pdoor.position.set(0,3.25,-11.6); g.add(pdoor);
+  /* cúpula central */
+  const dome=new THREE.Mesh(new THREE.SphereGeometry(5,16,10),white); dome.position.set(0,15,16); dome.scale.y=1.1; dome.castShadow=true; g.add(dome);
+  g.position.set(bx+12,0.25,cz); g.rotation.y=-Math.PI/2;
+  scene.add(g);
+  colliders.push({x:bx+12, z:cz, hw:18, hd:14});
+})();
+
+/* ---------- Casona Azul (estilo Casa Urquiaga) ---------- */
+(function(){
+  const [bx,bz]=blockOrigin(3,4);
+  const {g}=casona(20,11,2,'#1d5fa8');
+  g.position.set(bx+12,.25,bz+6); g.rotation.y=Math.PI;
+  scene.add(g);
+  colliders.push({x:bx+12,z:bz+6,hw:10,hd:5.5});
+  landmarks.push({name:'Casona Azul', x:bx+12, z:bz+2, r:9});
+})();
+
+/* ---------- Mercado Central ---------- */
+(function(){
+  const [bx,bz]=blockOrigin(2,2);
+  const cx=bx+BLOCK/2, cz=bz+BLOCK/2;
+  landmarks.push({name:'Mercado Central', x:cx, z:cz, r:16});
+  const hall=new THREE.Mesh(new THREE.BoxGeometry(34,8,30),new THREE.MeshLambertMaterial({map:getWall('#c8552f')}));
+  hall.position.set(cx,4.25,cz); hall.castShadow=true; hall.receiveShadow=true; scene.add(hall);
+  const roof=new THREE.Mesh(new THREE.CylinderGeometry(15,15,36,3,1),new THREE.MeshLambertMaterial({color:0x6b7d8c}));
+  roof.rotation.z=Math.PI/2; roof.rotation.x=Math.PI; roof.scale.y=1; roof.position.set(cx,8.2,cz);
+  roof.scale.set(.45,1.1,.6); scene.add(roof);
+  colliders.push({x:cx,z:cz,hw:17,hd:15});
+  /* puestos de fruta afuera */
+  const fruitCols=[0xe8b020,0xd84a2a,0x7ab32a,0xe07820];
+  for(let k=0;k<6;k++){
+    const st=new THREE.Group();
+    const table=new THREE.Mesh(new THREE.BoxGeometry(2.6,.9,1.4),woodMat); table.position.y=.45; st.add(table);
+    const awn=new THREE.Mesh(new THREE.BoxGeometry(3,.12,1.8),new THREE.MeshLambertMaterial({color:k%2?0xd8402a:0xf2e8d8}));
+    awn.position.y=2.3; st.add(awn);
+    for(let p=0;p<3;p++){
+      const fr=new THREE.Mesh(new THREE.SphereGeometry(.32,8,6),new THREE.MeshLambertMaterial({color:fruitCols[(k+p)%4]}));
+      fr.position.set(-.8+p*.8,1.1,0); st.add(fr);
+    }
+    st.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+    st.position.set(cx-12+k*5, .25, cz+17.5); scene.add(st);
+  }
+})();
+
+/* ---------- Parque con pileta (manzana 5,5) ---------- */
+(function(){
+  const [bx,bz]=blockOrigin(5,5);
+  const cx=bx+BLOCK/2, cz=bz+BLOCK/2;
+  landmarks.push({name:'Parque de la Marinera', x:cx, z:cz, r:14});
+  const lawn=new THREE.Mesh(new THREE.BoxGeometry(BLOCK-2,.3,BLOCK-2),new THREE.MeshLambertMaterial({map:grassTex}));
+  lawn.position.set(cx,.2,cz); lawn.receiveShadow=true; scene.add(lawn);
+  /* pileta */
+  const rim=new THREE.Mesh(new THREE.CylinderGeometry(5.4,5.6,1,24),frameMat); rim.position.set(cx,.7,cz); rim.castShadow=true; scene.add(rim);
+  const water=new THREE.Mesh(new THREE.CylinderGeometry(5,5,.2,24),
+    new THREE.MeshStandardMaterial({color:0x2a7fb8,roughness:.15,metalness:.3,transparent:true,opacity:.85}));
+  water.position.set(cx,1.1,cz); water.name='agua'; scene.add(water);
+  const jet=new THREE.Mesh(new THREE.CylinderGeometry(.5,.7,3,10),frameMat); jet.position.set(cx,2,cz); scene.add(jet);
+  colliders.push({x:cx,z:cz,hw:5.8,hd:5.8});
+  for(let k=0;k<6;k++){ const a=k*Math.PI/3; palmera(cx+Math.cos(a)*14, cz+Math.sin(a)*14); }
+  for(let k=0;k<4;k++){ const a=k*Math.PI/2+.4; banca(cx+Math.cos(a)*9, cz+Math.sin(a)*9, -a-Math.PI/2); }
+})();
+
+/* Cerros lejanos + ciudad distante */
+for(let k=0;k<10;k++){
+  const a=k/10*Math.PI*2;
+  const m=new THREE.Mesh(new THREE.ConeGeometry(120+Math.random()*90, 70+Math.random()*60, 7),
+    new THREE.MeshLambertMaterial({color:0x8a7c5e}));
+  m.position.set(Math.cos(a)*640, -6, Math.sin(a)*640);
+  scene.add(m);
+}
+
+/* ---------- Peatones ---------- */
+const peds=[];
+const skinCols=[0xb5805a,0x8a5a3a,0xd8a878];
+const shirtCols=[0xd84a2a,0x2a6db5,0xf2b705,0xf5f0e6,0x7d4a8c,0x2f7a33];
+function persona(){
+  const g=new THREE.Group();
+  const shirt=new THREE.MeshLambertMaterial({color:shirtCols[Math.random()*shirtCols.length|0]});
+  const pant=new THREE.MeshLambertMaterial({color:Math.random()<.5?0x2a2a38:0x4a4a5a});
+  const skin=new THREE.MeshLambertMaterial({color:skinCols[Math.random()*skinCols.length|0]});
+  const legs=new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,.85,8),pant); legs.position.y=.43; g.add(legs);
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.3,.27,.8,8),shirt); body.position.y=1.25; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.24,10,8),skin); head.position.y=1.95; g.add(head);
+  if(Math.random()<.3){ const hat=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.07,10),new THREE.MeshLambertMaterial({color:0xe8dcc0})); hat.position.y=2.12; g.add(hat); }
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+  return g;
+}
+for(let k=0;k<26;k++){
+  const g=persona();
+  const ang=Math.random()*Math.PI*2;
+  g.position.set(PCX+(Math.random()-.5)*120, .25, PCZ+(Math.random()-.5)*120);
+  scene.add(g);
+  peds.push({g, dir:ang, t:Math.random()*5, speed:.9+Math.random()*.8});
+}
+
+/* ---------- Autos ---------- */
+const cars=[];
+const carCols=[0xd8d8d8,0xc8a818,0xb02a2a,0x2a4a8c,0x1a1a1a,0xe8e8e8];
+function auto(taxi){
+  const g=new THREE.Group();
+  const col=taxi?0xf2c200:carCols[Math.random()*carCols.length|0];
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2,.75,4.3),new THREE.MeshStandardMaterial({color:col,roughness:.35,metalness:.5}));
+  body.position.y=.75; body.castShadow=true; g.add(body);
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(1.8,.65,2.2),new THREE.MeshStandardMaterial({color:0x1a2530,roughness:.1,metalness:.6}));
+  cab.position.set(0,1.4,-.2); g.add(cab);
+  if(taxi){ const sg=new THREE.Mesh(new THREE.BoxGeometry(.7,.25,.4),new THREE.MeshLambertMaterial({color:0xffffff,emissive:0x888866})); sg.position.set(0,1.85,-.2); g.add(sg); }
+  const wgeo=new THREE.CylinderGeometry(.42,.42,.3,10);
+  const wmat=new THREE.MeshLambertMaterial({color:0x141414});
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>{
+    const w=new THREE.Mesh(wgeo,wmat); w.rotation.z=Math.PI/2;
+    w.position.set(sx*1.05,.42,sz*1.4); g.add(w);
+  });
+  /* luces */
+  const hl=new THREE.Mesh(new THREE.BoxGeometry(1.7,.18,.1),new THREE.MeshLambertMaterial({color:0xfff8d8,emissive:0xfff0a0,emissiveIntensity:0}));
+  hl.position.set(0,.78,2.2); hl.name='hl'; g.add(hl);
+  return g;
+}
+/* rutas: avenidas en cuadrícula */
+const carLanes=[];
+for(let i=1;i<GRID;i++){
+  const c=-HALF + i*(BLOCK+ST) - ST/2;
+  carLanes.push({axis:'x', pos:c+3, dir:1});
+  carLanes.push({axis:'x', pos:c-3, dir:-1});
+  carLanes.push({axis:'z', pos:c+3, dir:-1});
+  carLanes.push({axis:'z', pos:c-3, dir:1});
+}
+for(let k=0;k<16;k++){
+  const lane=carLanes[Math.random()*carLanes.length|0];
+  const g=auto(Math.random()<.35);
+  const s=(Math.random()*2-1)*HALF;
+  if(lane.axis==='x'){ g.position.set(s,.05,lane.pos); g.rotation.y=lane.dir>0?Math.PI/2:-Math.PI/2; }
+  else { g.position.set(lane.pos,.05,s); g.rotation.y=lane.dir>0?0:Math.PI; }
+  scene.add(g);
+  cars.push({g,lane,speed:9+Math.random()*7});
+}
+
+/* ---------- Gallinazos (aves) ---------- */
+const birds=[];
+for(let k=0;k<8;k++){
+  const b=new THREE.Group();
+  const bd=new THREE.Mesh(new THREE.SphereGeometry(.3,6,5),new THREE.MeshLambertMaterial({color:0x222})); bd.scale.z=1.8; b.add(bd);
+  for(let s=-1;s<=1;s+=2){ const w=new THREE.Mesh(new THREE.BoxGeometry(1.4,.05,.45),new THREE.MeshLambertMaterial({color:0x222})); w.position.x=s*.8; w.name='w'+s; b.add(w); }
+  b.position.set(PCX,40+Math.random()*15,PCZ);
+  scene.add(b); birds.push({g:b, r:20+Math.random()*40, a:Math.random()*7, v:.3+Math.random()*.4, h:35+Math.random()*20});
+}
+
+/* ============================================================
+   JUGADOR Y CONTROLES
+   ============================================================ */
+const player={ x:PCX, z:PCZ+26, yaw:Math.PI, pitch:0, vy:0, run:false };
+const keys={};
+addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='ShiftLeft')player.run=true; });
+addEventListener('keyup',e=>{ keys[e.code]=false; if(e.code==='ShiftLeft')player.run=false; });
+
+/* Pointer lock (PC) */
+const cvs=$('c');
+cvs.addEventListener('click',()=>{ if(!isTouch && started) cvs.requestPointerLock(); });
+addEventListener('mousemove',e=>{
+  if(document.pointerLockElement===cvs){
+    player.yaw -= e.movementX*.0023;
+    player.pitch = Math.max(-1.3, Math.min(1.3, player.pitch - e.movementY*.0023));
+  }
+});
+
+/* Joystick táctil */
+const joy={active:false,id:null,dx:0,dy:0};
+const look={active:false,id:null,lx:0,ly:0};
+const joyEl=$('joy'), knob=$('knob');
+function joyCenter(){ const r=joyEl.getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2]; }
+addEventListener('touchstart',e=>{
+  for(const t of e.changedTouches){
+    if(t.clientX < innerWidth*.45 && t.clientY > innerHeight*.5 && !joy.active){
+      joy.active=true; joy.id=t.identifier;
+    } else if(!look.active){
+      look.active=true; look.id=t.identifier; look.lx=t.clientX; look.ly=t.clientY;
+    }
+  }
+},{passive:false});
+addEventListener('touchmove',e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches){
+    if(joy.active && t.identifier===joy.id){
+      const [cx,cy]=joyCenter();
+      let dx=t.clientX-cx, dy=t.clientY-cy;
+      const m=Math.hypot(dx,dy), max=46;
+      if(m>max){ dx*=max/m; dy*=max/m; }
+      joy.dx=dx/max; joy.dy=dy/max;
+      knob.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    }
+    if(look.active && t.identifier===look.id){
+      player.yaw -= (t.clientX-look.lx)*.0045;
+      player.pitch = Math.max(-1.3, Math.min(1.3, player.pitch-(t.clientY-look.ly)*.0045));
+      look.lx=t.clientX; look.ly=t.clientY;
+    }
+  }
+},{passive:false});
+addEventListener('touchend',e=>{
+  for(const t of e.changedTouches){
+    if(t.identifier===joy.id){ joy.active=false; joy.dx=joy.dy=0; knob.style.transform='translate(-50%,-50%)'; }
+    if(t.identifier===look.id){ look.active=false; }
+  }
+});
+$('bRun').addEventListener('touchstart',e=>{ e.stopPropagation(); player.run=!player.run; $('bRun').style.background=player.run?'rgba(242,183,5,.55)':''; });
+$('bTime').addEventListener('touchstart',e=>{ e.stopPropagation(); dayTime=(dayTime+.25)%1; });
+$('bTime').addEventListener('click',()=>{ dayTime=(dayTime+.25)%1; });
+
+/* Colisiones simples */
+function collide(nx,nz){
+  const R=.6;
+  for(const c of colliders){
+    if(Math.abs(nx-c.x)<c.hw+R && Math.abs(nz-c.z)<c.hd+R) return true;
+  }
+  return false;
+}
+
+/* ============================================================
+   MISIONES
+   ============================================================ */
+const missions=[
+  {name:'Plaza de Armas',  desc:'Llega al Monumento a la Libertad'},
+  {name:'Catedral de Trujillo', desc:'Visita la catedral amarilla'},
+  {name:'Casona Azul', desc:'Encuentra la casona colonial azul'},
+  {name:'Mercado Central', desc:'Pasa por los puestos del mercado'},
+  {name:'Parque de la Marinera', desc:'Descansa junto a la pileta'},
+].map(m=>{ const lm=landmarks.find(l=>l.name===m.name); return {...m, ...lm, done:false}; });
+
+function renderMissions(){
+  $('mlist').innerHTML = missions.map(m=>{
+    const d=Math.hypot(player.x-m.x, player.z-m.z)|0;
+    return `<div class="mi ${m.done?'done':''}">${m.done?'✅':'📍'} ${m.name} ${m.done?'':`<span class="d">· ${d} m</span>`}</div>`;
+  }).join('');
+}
+let toastT=null;
+function toast(msg){
+  const t=$('toast'); t.innerHTML=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 3200);
+}
+
+/* ============================================================
+   CICLO DÍA / NOCHE
+   ============================================================ */
+let dayTime=.32; // 0=medianoche, .5=mediodía
+const skyDay={top:new THREE.Color(0x3f8ddc),bot:new THREE.Color(0xcfe8ff)};
+const skyDusk={top:new THREE.Color(0x4a3a7a),bot:new THREE.Color(0xe88a4a)};
+const skyNight={top:new THREE.Color(0x060a18),bot:new THREE.Color(0x101a30)};
+const tmpA=new THREE.Color(), tmpB=new THREE.Color();
+/* Estrellas */
+const starGeo=new THREE.BufferGeometry();
+const starPos=new Float32Array(600*3);
+for(let i=0;i<600;i++){
+  const a=Math.random()*Math.PI*2, e=Math.random()*Math.PI*.48;
+  starPos[i*3]=Math.cos(a)*Math.cos(e)*850;
+  starPos[i*3+1]=Math.sin(e)*850+30;
+  starPos[i*3+2]=Math.sin(a)*Math.cos(e)*850;
+}
+starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3));
+const stars=new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xffffff,size:1.6,transparent:true,opacity:0}));
+scene.add(stars);
+
+function updateSky(){
+  const t=dayTime;
+  const sunAng=(t-.25)*Math.PI*2;          // amanece a t=.25
+  const sy=Math.sin(sunAng), sx=Math.cos(sunAng);
+  sun.position.set(player.x+sx*180, sy*180, player.z+60);
+  sun.target.position.set(player.x, 0, player.z);
+  const dayF=Math.max(0,Math.min(1,(sy+.12)*3));        // factor día
+  const duskF=Math.max(0,1-Math.abs(sy)*5)* (sy>-.2?1:0); // factor crepúsculo
+  sun.intensity=1.7*dayF;
+  hemi.intensity=.15+.75*dayF;
+  sun.color.setHSL(.11, .55, .5+.4*Math.min(1,Math.max(0,sy*2)));
+  tmpA.copy(skyNight.top).lerp(skyDay.top,dayF).lerp(skyDusk.top,duskF*.7);
+  tmpB.copy(skyNight.bot).lerp(skyDay.bot,dayF).lerp(skyDusk.bot,duskF);
+  skyMat.uniforms.top.value.copy(tmpA);
+  skyMat.uniforms.bot.value.copy(tmpB);
+  scene.fog.color.copy(tmpB);
+  stars.material.opacity=Math.max(0,1-dayF*2);
+  const night=1-dayF;
+  lampGlows.forEach(m=>m.emissiveIntensity=night*1.4);
+  winLitMat.emissiveIntensity=night*.9;
+  cars.forEach(c=>{ const hl=c.g.getObjectByName('hl'); if(hl) hl.material.emissiveIntensity=night*1.5; });
+  /* reloj */
+  const hrs=(t*24)|0, min=((t*24%1)*60)|0;
+  const h12=((hrs+11)%12)+1, ap=hrs<12?'a.m.':'p.m.';
+  const icon=dayF>.6?'☀️':(night>.7?'🌙':'🌅');
+  $('clock').textContent=`${icon} ${h12}:${String(min).padStart(2,'0')} ${ap}`;
+}
+
+/* ============================================================
+   MINIMAPA
+   ============================================================ */
+const mm=$('mmc').getContext('2d');
+function drawMinimap(){
+  const W=260,S=.62;
+  mm.clearRect(0,0,W,W);
+  mm.save(); mm.translate(W/2,W/2); mm.rotate(-player.yaw-Math.PI);
+  mm.fillStyle='#5a6a4a'; mm.fillRect(-W,-W,W*2,W*2);
+  /* calles */
+  mm.fillStyle='#3a3a40';
+  for(let i=0;i<=GRID;i++){
+    const c=(-HALF + i*(BLOCK+ST) - ST/2);
+    mm.fillRect((c-ST/2-player.x)*S, -W, ST*S, W*2);
+    mm.fillRect(-W, (c-ST/2-player.z)*S, W*2, ST*S);
+  }
+  /* manzanas */
+  mm.fillStyle='#8a7c5e';
+  for(let i=0;i<GRID;i++)for(let j=0;j<GRID;j++){
+    const [bx,bz]=blockOrigin(i,j);
+    mm.fillRect((bx-player.x)*S,(bz-player.z)*S,BLOCK*S,BLOCK*S);
+  }
+  /* plaza */
+  mm.fillStyle='#4a8c3a';
+  mm.beginPath(); mm.arc((PCX-player.x)*S,(PCZ-player.z)*S,BLOCK/2*S,0,7); mm.fill();
+  /* misiones */
+  missions.forEach(m=>{
+    mm.fillStyle=m.done?'#7a7a7a':'#f2b705';
+    mm.beginPath(); mm.arc((m.x-player.x)*S,(m.z-player.z)*S,5,0,7); mm.fill();
+  });
+  mm.restore();
+  /* jugador */
+  mm.fillStyle='#fff';
+  mm.beginPath(); mm.moveTo(W/2,W/2-9); mm.lineTo(W/2-6,W/2+6); mm.lineTo(W/2+6,W/2+6); mm.closePath(); mm.fill();
+}
+
+/* ============================================================
+   BUCLE PRINCIPAL
+   ============================================================ */
+let started=false, last=performance.now(), mmTick=0, msTick=0;
+const fwd=new THREE.Vector3();
+
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min(.05,(now-last)/1000); last=now;
+  if(!started) { renderer.render(scene,camera); return; }
+
+  dayTime=(dayTime+dt/360)%1;   // 6 min = un día completo
+  updateSky();
+
+  /* movimiento */
+  let mx=0,mz=0;
+  if(keys.KeyW||keys.ArrowUp)mz-=1; if(keys.KeyS||keys.ArrowDown)mz+=1;
+  if(keys.KeyA||keys.ArrowLeft)mx-=1; if(keys.KeyD||keys.ArrowRight)mx+=1;
+  mx+=joy.dx; mz+=joy.dy;
+  const ml=Math.hypot(mx,mz);
+  if(ml>0){
+    mx/=Math.max(1,ml); mz/=Math.max(1,ml);
+    const sp=(player.run?9.5:4.6)*dt;
+    const sin=Math.sin(player.yaw), cos=Math.cos(player.yaw);
+    const dx=(mx*cos - mz*sin)*sp;
+    const dz=(-mx*sin - mz*cos)*sp;
+    let nx=player.x+dx, nz=player.z+dz;
+    nx=Math.max(-HALF-30,Math.min(HALF+30,nx));
+    nz=Math.max(-HALF-30,Math.min(HALF+30,nz));
+    if(!collide(nx,player.z)) player.x=nx;
+    if(!collide(player.x,nz)) player.z=nz;
+  }
+  /* cámara con balanceo al caminar */
+  const bob=ml>0?Math.sin(now*.012*(player.run?1.6:1))*.05:0;
+  camera.position.set(player.x, 1.72+bob, player.z);
+  camera.rotation.order='YXZ';
+  camera.rotation.y=player.yaw;
+  camera.rotation.x=player.pitch;
+
+  /* peatones */
+  peds.forEach(p=>{
+    p.t-=dt;
+    if(p.t<0){ p.t=2+Math.random()*5; p.dir+= (Math.random()-.5)*2.2; }
+    const nx=p.g.position.x+Math.cos(p.dir)*p.speed*dt;
+    const nz=p.g.position.z+Math.sin(p.dir)*p.speed*dt;
+    if(!collide(nx,nz) && Math.abs(nx)<HALF && Math.abs(nz)<HALF){
+      p.g.position.x=nx; p.g.position.z=nz;
+      p.g.rotation.y=-p.dir+Math.PI/2;
+      p.g.position.y=.25+Math.abs(Math.sin(now*.008*p.speed))*.05;
+    } else p.dir+=Math.PI/2;
+  });
+
+  /* autos */
+  cars.forEach(c=>{
+    const d=c.speed*dt*c.lane.dir;
+    if(c.lane.axis==='x'){ c.g.position.x+=d; if(Math.abs(c.g.position.x)>HALF+20) c.g.position.x=-Math.sign(c.g.position.x)*(HALF+20); }
+    else { c.g.position.z-=d; if(Math.abs(c.g.position.z)>HALF+20) c.g.position.z=-Math.sign(c.g.position.z)*(HALF+20); }
+  });
+
+  /* aves y nubes */
+  birds.forEach(b=>{
+    b.a+=b.v*dt*.5;
+    b.g.position.set(PCX+Math.cos(b.a)*b.r, b.h+Math.sin(b.a*3)*3, PCZ+Math.sin(b.a)*b.r);
+    b.g.rotation.y=-b.a;
+    const f=Math.sin(now*.02)*.5;
+    const w1=b.g.getObjectByName('w-1'), w2=b.g.getObjectByName('w1');
+    if(w1){w1.rotation.z=f;} if(w2){w2.rotation.z=-f;}
+  });
+  scene.children.forEach(o=>{ if(o.name==='cloud'){ o.position.x+=o.userData.v*dt; if(o.position.x>500)o.position.x=-500; } });
+  const agua=scene.getObjectByName('agua'); if(agua) agua.position.y=1.1+Math.sin(now*.003)*.04;
+
+  /* misiones + nombre de zona */
+  msTick-=dt;
+  if(msTick<0){
+    msTick=.4;
+    let zone='Centro Histórico';
+    missions.forEach(m=>{
+      const d=Math.hypot(player.x-m.x, player.z-m.z);
+      if(d<m.r){
+        zone=m.name;
+        if(!m.done){
+          m.done=true;
+          const left=missions.filter(x=>!x.done).length;
+          toast(left===0
+            ? '🏆 ¡Felicitaciones! Exploraste todo el centro de Trujillo.<br><small>Eres oficialmente un trujillano de corazón 🇵🇪</small>'
+            : `✅ <b>${m.name}</b> descubierto<br><small>${left} lugar${left>1?'es':''} por explorar</small>`);
+        }
+      }
+    });
+    $('locname').textContent=zone;
+    renderMissions();
+  }
+  mmTick-=dt; if(mmTick<0){ mmTick=.15; drawMinimap(); }
+
+  renderer.render(scene,camera);
+}
+requestAnimationFrame(loop);
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+$('play').addEventListener('click',()=>{
+  $('fade').style.opacity=1;
+  setTimeout(()=>{
+    $('start').style.display='none';
+    $('fade').style.opacity=0;
+    started=true;
+    renderMissions();
+    toast('🌇 Bienvenido a Trujillo, la Ciudad de la Eterna Primavera.<br><small>Sigue los puntos amarillos del minimapa.</small>');
+    if(!isTouch) cvs.requestPointerLock();
+  },600);
+});
+</script>
+</body>
+</html>
