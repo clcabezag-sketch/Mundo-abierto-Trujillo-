@@ -85,7 +85,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 0.92;
 renderer.outputEncoding = THREE.sRGBEncoding;
 
 const scene = new THREE.Scene();
@@ -93,9 +93,9 @@ scene.fog = new THREE.Fog(0xc4dcee, 90, 560);
 const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, .1, 1400);
 
 /* ---------- Luz ---------- */
-const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x8a7355, .85);
+const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x8a7355, .55);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff3d6, 1.6);
+const sun = new THREE.DirectionalLight(0xfff3d6, 1.15);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left=-150; sun.shadow.camera.right=150;
@@ -904,8 +904,8 @@ function updateSky(){
   sun.target.position.set(player.x,0,player.z);
   const dayF=Math.max(0,Math.min(1,(sy+.12)*3));
   const duskF=Math.max(0,1-Math.abs(sy)*5)*(sy>-.2?1:0);
-  sun.intensity=1.7*dayF;
-  hemi.intensity=.15+.75*dayF;
+  sun.intensity=1.2*dayF;
+  hemi.intensity=.1+.48*dayF;
   sun.color.setHSL(.11,.55,.5+.4*Math.min(1,Math.max(0,sy*2)));
   tmpA.copy(skyNight.top).lerp(skyDay.top,dayF).lerp(skyDusk.top,duskF*.7);
   tmpB.copy(skyNight.bot).lerp(skyDay.bot,dayF).lerp(skyDusk.bot,duskF);
